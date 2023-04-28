@@ -1,5 +1,5 @@
 # e2m-gateway-api-01
-refreshing E2M with Gateway API
+refreshing E2M with Gateway API and integrating [Certificate Manager](https://cloud.google.com/certificate-manager/docs/overview)
 
 ### set environment vars
 ```
@@ -31,6 +31,13 @@ gcloud container fleet memberships list --project ${PROJECT}
 
 gcloud container clusters update ${CLUSTER_NAME} --project ${PROJECT} \
   --region ${REGION} --update-labels mesh_id=proj-${PROJECT_NUMBER}
+
+# manually updating cluster to also include Gateway API for now
+gcloud container clusters update ${CLUSTER_NAME} --project ${PROJECT} \
+  --region ${REGION} --gateway-api=standard
+
+# verify gateway classes
+kubectl get gatewayclass
 
 gcloud container fleet mesh update \
     --management automatic \
