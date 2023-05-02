@@ -216,7 +216,7 @@ spec:
   targetRef:
     group: ""
     kind: Service
-    name: lb-service
+    name: asm-ingressgateway
 EOF
 
 # apply backend policy
@@ -254,7 +254,7 @@ spec:
     #port: 15021
   targetRef:
     group: ""
-    kind: ServiceImport
+    kind: Service
     name: asm-ingressgateway
 EOF
 
@@ -286,12 +286,42 @@ gcloud --project=${PROJECT} endpoints services deploy dns-spec.yaml
 
 ```
 
-### Configure certificate maps 
+### Configure Certificate Manager resources 
 
 some notes 
 https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#restrictions_and_limitations
 https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-using-certificate-manager
 
 ```
+#create certificate 
+gcloud --project=${PROJECT} certificate-manager certificates create edge2mesh-cert \
+    --domains="frontend.endpoints.${PROJECT}.cloud.goog"
+
 # create certificate map 
 gcloud --project=${PROJECT} certificate-manager maps create edge2mesh-cert-map
+
+# create certificate map entry
+gcloud --project=${PROJECT} certificate-manager maps entries create edge2mesh-cert-map-entry \
+    --map="edge2mesh-cert-map" \
+    --certificates="edge2mesh-cert" \
+    --hostname="frontend.endpoints.${PROJECT}.cloud.goog"
+```
+
+### Create Gateway and HTTPRoute
+
+```
+cat <<EOF > gateway-spec.yaml
+kind: Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: external-http
+  annotations:
+    networking.gke.io/certmap: edge2mesh-cert-map
+spec:
+  gatewayClassName: gke-l7-gxlb
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+EOF
+```

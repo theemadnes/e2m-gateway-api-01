@@ -25,5 +25,5 @@ spec:
     #port: 15021
   targetRef:
     group: ""
-    kind: ServiceImport
+    kind: Service
     name: asm-ingressgateway

@@ -9,4 +9,4 @@ spec:
   targetRef:
     group: ""
     kind: Service
-    name: lb-service
+    name: asm-ingressgateway
