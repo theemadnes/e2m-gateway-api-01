@@ -307,21 +307,118 @@ gcloud --project=${PROJECT} certificate-manager maps entries create edge2mesh-ce
     --hostname="frontend.endpoints.${PROJECT}.cloud.goog"
 ```
 
+### Configure ASM/Istio Gateway resource and self-signed certificate
+```
+openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+ -subj "/CN=frontend.endpoints.${PROJECT}.cloud.goog/O=Edge2Mesh Inc" \
+ -keyout frontend.endpoints.${PROJECT}.cloud.goog.key \
+ -out frontend.endpoints.${PROJECT}.cloud.goog.crt
+
+kubectl -n asm-ingress create secret tls edge2mesh-credential \
+ --key=frontend.endpoints.${PROJECT}.cloud.goog.key \
+ --cert=frontend.endpoints.${PROJECT}.cloud.goog.crt
+
+cat <<EOF > ingress-gateway.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+    name: asm-ingressgateway
+    namespace: asm-ingress
+spec:
+  selector:
+    asm: ingressgateway
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "*" # IMPORTANT: Must use wildcard here when using SSL, see note below
+    tls:
+      mode: SIMPLE
+      credentialName: edge2mesh-credential
+EOF
+
+kubectl apply -f ingress-gateway.yaml
+```
+
+### Deploy Online Boutique
+```
+kubectl create namespace onlineboutique
+
+kubectl label namespace onlineboutique istio-injection=enabled
+
+curl -LO \
+    https://raw.githubusercontent.com/GoogleCloudPlatform/microservices-demo/main/release/kubernetes-manifests.yaml
+
+kubectl apply -f kubernetes-manifests.yaml -n onlineboutique
+
+
+cat <<EOF > frontend-virtualservice.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: frontend-ingress
+  namespace: onlineboutique
+spec:
+  hosts:
+  - "frontend.endpoints.${PROJECT}.cloud.goog"
+  gateways:
+  - asm-ingress/asm-ingressgateway
+  http:
+  - route:
+    - destination:
+        host: frontend
+        port:
+          number: 80
+EOF
+
+kubectl apply -f frontend-virtualservice.yaml
+```
+
 ### Create Gateway and HTTPRoute
 
 ```
-cat <<EOF > gateway-spec.yaml
+cat <<EOF > gateway.yaml
 kind: Gateway
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
   name: external-http
+  namespace: asm-ingress
   annotations:
     networking.gke.io/certmap: edge2mesh-cert-map
 spec:
-  gatewayClassName: gke-l7-gxlb
+  gatewayClassName: gke-l7-global-external-managed # gke-l7-gxlb
   listeners:
   - name: https
     protocol: HTTPS
     port: 443
+  addresses:
+  - type: NamedAddress
+    value: ingress-ip
 EOF
+
+kubectl apply -f gateway.yaml
+
+cat << EOF > httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: asm-ingressgateway-httproute
+  namespace: asm-ingress
+spec:
+  parentRefs:
+  - name: external-http
+  hostnames:
+  - frontend.endpoints.am-arg-01.cloud.goog # hard-coding for now 
+  rules:
+  - matches:
+    - path:
+        value: /
+    backendRefs:
+    - name: asm-ingressgateway
+      port: 443
+EOF
+
+kubectl apply -f httproute.yaml
 ```
