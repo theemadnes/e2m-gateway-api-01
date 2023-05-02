@@ -260,3 +260,31 @@ EOF
 # apply the healthcheck
 kubectl apply -f ingress-gateway-healthcheck.yaml
 ```
+
+### Configure IP addressing and DNS
+```
+gcloud --project=${PROJECT} compute addresses create ingress-ip --global
+
+export GCLB_IP=$(gcloud --project=${PROJECT} compute addresses describe ingress-ip --global --format "value(address)")
+echo ${GCLB_IP}
+
+cat <<EOF > dns-spec.yaml
+swagger: "2.0"
+info:
+  description: "Cloud Endpoints DNS"
+  title: "Cloud Endpoints DNS"
+  version: "1.0.0"
+paths: {}
+host: "frontend.endpoints.${PROJECT}.cloud.goog"
+x-google-endpoints:
+- name: "frontend.endpoints.${PROJECT}.cloud.goog"
+  target: "${GCLB_IP}"
+EOF
+
+gcloud --project=${PROJECT} endpoints services deploy dns-spec.yaml
+
+```
+
+### Configure certificate maps 
+
+TODO
