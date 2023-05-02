@@ -191,7 +191,7 @@ kubectl apply -f ingress-service.yaml
 
 ```
 
-### create cloud armore security policy and reference via GCP backend policy
+### create cloud armor security policy and reference via GCP backend policy
 ```
 # https://cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_cloud_armor
 gcloud compute security-policies create edge-fw-policy \
@@ -294,4 +294,4 @@ https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-usi
 
 ```
 # create certificate map 
-gcloud --project=${PROJECT} certificate-manager maps create edge2mesh-map
+gcloud --project=${PROJECT} certificate-manager maps create edge2mesh-cert-map
