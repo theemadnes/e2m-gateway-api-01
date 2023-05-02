@@ -1,0 +1,29 @@
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: ingress-gateway-healthcheck
+  namespace: asm-ingress
+spec:
+  default:
+    checkIntervalSec: 20
+    timeoutSec: 5
+    #healthyThreshold: HEALTHY_THRESHOLD
+    #unhealthyThreshold: UNHEALTHY_THRESHOLD
+    logConfig:
+      enabled: True
+    config:
+      type: HTTP
+      httpHealthCheck:
+        #portSpecification: USE_NAMED_PORT
+        port: 15021
+        portName: status-port
+        #host: HOST
+        requestPath: /healthz/ready
+        #response: RESPONSE
+        #proxyHeader: PROXY_HEADER
+    #requestPath: /healthz/ready
+    #port: 15021
+  targetRef:
+    group: ""
+    kind: ServiceImport
+    name: asm-ingressgateway

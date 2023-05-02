@@ -46,3 +46,217 @@ gcloud container fleet mesh update \
 
 gcloud container fleet mesh describe --project ${PROJECT}
 ```
+
+### start setting up ASM ingress gateway layer
+```
+kubectl create namespace asm-ingress
+kubectl label namespace asm-ingress istio-injection=enabled
+
+
+# get the ingress gateway deployment config to local YAML
+cat <<EOF > ingress-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+spec:
+  selector:
+    matchLabels:
+      asm: ingressgateway
+  template:
+    metadata:
+      annotations:
+        # This is required to tell Anthos Service Mesh to inject the gateway with the
+        # required configuration.
+        inject.istio.io/templates: gateway
+      labels:
+        asm: ingressgateway
+    spec:
+      securityContext:
+        fsGroup: 1337
+        runAsGroup: 1337
+        runAsNonRoot: true
+        runAsUser: 1337
+      containers:
+      - name: istio-proxy
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: auto # The image will automatically update each time the pod starts.
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 1024Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      serviceAccountName: asm-ingressgateway
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+spec:
+  maxReplicas: 5
+  minReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: asm-ingressgateway
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: asm-ingressgateway
+subjects:
+  - kind: ServiceAccount
+    name: asm-ingressgateway
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+EOF
+
+
+# apply the ingress deployment 
+kubectl apply -f ingress-deployment.yaml
+
+```
+
+### expose the ingress gateway deployment via ClusterIP service w/ NEGs
+```
+cat <<EOF > ingress-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+  labels:
+    asm: ingressgateway
+spec:
+  ports:
+  # status-port exposes a /healthz/ready endpoint that can be used with GKE Ingress health checks
+  - name: status-port
+    port: 15021
+    protocol: TCP
+    targetPort: 15021
+  # Any ports exposed in Gateway resources should be exposed here.
+  - name: http2
+    port: 80
+    targetPort: 8080
+  - name: https
+    port: 443
+    targetPort: 8443
+    appProtocol: HTTP2 # https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#load-balancer-tls
+  selector:
+    asm: ingressgateway
+  type: ClusterIP
+EOF
+
+# apply service
+kubectl apply -f ingress-service.yaml
+
+```
+
+### create cloud armore security policy and reference via GCP backend policy
+```
+# https://cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_cloud_armor
+gcloud compute security-policies create edge-fw-policy \
+    --project=${PROJECT} --description "Block XSS attacks"
+
+gcloud compute security-policies rules create 1000 \
+    --security-policy edge-fw-policy \
+    --expression "evaluatePreconfiguredExpr('xss-stable')" \
+    --action "deny-403" \
+    --project=${PROJECT} \
+    --description "XSS attack filtering" 
+
+cat <<EOF > cloud-armor-backendpolicy.yaml
+apiVersion: networking.gke.io/v1
+kind: GCPBackendPolicy
+metadata:
+  name: cloud-armor-backendpolicy
+  namespace: asm-ingress
+spec:
+  default:
+    securityPolicy: edge-fw-policy
+  targetRef:
+    group: ""
+    kind: Service
+    name: lb-service
+EOF
+
+# apply backend policy
+kubectl apply -f cloud-armor-backendpolicy.yaml
+```
+
+### create ingress gateway health check policy
+```
+# see https://cloud.google.com/kubernetes-engine/docs/how-to/configure-gateway-resources#configure_health_check
+cat <<EOF > ingress-gateway-healthcheck.yaml
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: ingress-gateway-healthcheck
+  namespace: asm-ingress
+spec:
+  default:
+    checkIntervalSec: 20
+    timeoutSec: 5
+    #healthyThreshold: HEALTHY_THRESHOLD
+    #unhealthyThreshold: UNHEALTHY_THRESHOLD
+    logConfig:
+      enabled: True
+    config:
+      type: HTTP
+      httpHealthCheck:
+        #portSpecification: USE_NAMED_PORT
+        port: 15021
+        portName: status-port
+        #host: HOST
+        requestPath: /healthz/ready
+        #response: RESPONSE
+        #proxyHeader: PROXY_HEADER
+    #requestPath: /healthz/ready
+    #port: 15021
+  targetRef:
+    group: ""
+    kind: ServiceImport
+    name: asm-ingressgateway
+EOF
+
+# apply the healthcheck
+kubectl apply -f ingress-gateway-healthcheck.yaml
+```
