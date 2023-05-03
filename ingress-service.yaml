@@ -3,8 +3,8 @@ kind: Service
 metadata:
   name: asm-ingressgateway
   namespace: asm-ingress
-  annotations:
-    cloud.google.com/neg: '{"ingress": true}'
+  #annotations:
+  #  cloud.google.com/neg: '{"ingress": true}'
   labels:
     asm: ingressgateway
 spec:
