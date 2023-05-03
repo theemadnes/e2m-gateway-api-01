@@ -289,8 +289,8 @@ gcloud --project=${PROJECT} endpoints services deploy dns-spec.yaml
 ### Configure Certificate Manager resources 
 
 some notes 
-https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#restrictions_and_limitations
-https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-using-certificate-manager
+- https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#restrictions_and_limitations
+- https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-using-certificate-manager
 
 ```
 #create certificate 
