@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: whereami-vs
+  namespace: whereami
+spec:
+  gateways:
+  - asm-ingress/asm-ingressgateway
+  hosts:
+  - 'whereami.example.com'
+  http:
+  - route:
+    - destination:
+        host: whereami
+        port:
+          number: 80

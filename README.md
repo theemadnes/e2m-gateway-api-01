@@ -422,3 +422,74 @@ EOF
 
 kubectl apply -f edge2mesh-httproute.yaml
 ```
+
+### testing adding whereami with self-signed cert to existing cert map
+
+```
+# do whereami deployment / svc creation
+kubectl create ns whereami 
+kubectl label namespace whereami istio-injection=enabled
+
+mkdir -p whereami/base
+mkdir whereami/variant
+
+# TODO: bases and patches are deprecated, so replace with updated approaches
+cat << EOF > whereami/base/kustomization.yaml
+bases:
+  - github.com/GoogleCloudPlatform/kubernetes-engine-samples/whereami/k8s
+EOF
+
+cat << EOF > whereami/variant/service-type.yaml
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "whereami"
+spec:
+  type: ClusterIP
+EOF
+
+cat << EOF > whereami/variant/kustomization.yaml
+namespace: whereami
+commonLabels:
+  app: whereami
+bases:
+- ../base
+patchesStrategicMerge:
+- service-type.yaml
+EOF
+
+kubectl apply -k whereami/variant/
+
+# create virtualservice for whereami
+cat <<EOF > whereami/whereami-vs.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: whereami-vs
+  namespace: whereami
+spec:
+  gateways:
+  - asm-ingress/asm-ingressgateway
+  hosts:
+  - 'whereami.example.com'
+  http:
+  - route:
+    - destination:
+        host: whereami
+        port:
+          number: 80
+EOF
+
+kubectl apply -f whereami/whereami-vs.yaml
+
+# create self-signed cert for whereami and add to cert map
+# using https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-using-ssl-certificate
+openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+ -subj "/CN=whereami.example.com/O=Edge2Mesh Inc" \
+ -keyout whereami.example.com.key \
+ -out whereami.example.com.crt
+
+
+# create httproute for whereami 
+
+```
