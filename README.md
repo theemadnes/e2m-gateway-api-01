@@ -410,7 +410,7 @@ spec:
   parentRefs:
   - name: external-http
   hostnames:
-  - frontend.endpoints.am-arg-01.cloud.goog # hard-coding for now 
+  - frontend.endpoints.${PROJECT}.cloud.goog
   rules:
   - matches:
     - path:
