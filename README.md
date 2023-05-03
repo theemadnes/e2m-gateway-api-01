@@ -524,3 +524,28 @@ EOF
 
 kubectl apply -f whereami/whereami-httproute.yaml
 ```
+
+### testing stuff
+
+```
+# hit the main service
+curl https://frontend.endpoints.${PROJECT}.cloud.goog
+
+# hit the other one i created using a secondary self-signed cert
+curl --insecure https://whereami-test.alexmattson.demo.altostrat.com
+{
+  "cluster_name": "edge-to-mesh",
+  "gce_instance_id": "907290266501410452",
+  "gce_service_account": "am-arg-01.svc.id.goog",
+  "host_header": "whereami-test.alexmattson.demo.altostrat.com",
+  "metadata": "frontend",
+  "node_name": "gk3-edge-to-mesh-pool-2-d608f623-ps84",
+  "pod_ip": "10.26.128.202",
+  "pod_name": "whereami-5667d854d-7j4b2",
+  "pod_name_emoji": "🤽",
+  "pod_namespace": "whereami",
+  "pod_service_account": "whereami",
+  "project_id": "am-arg-01",
+  "timestamp": "2023-05-03T03:58:43",
+  "zone": "us-central1-a"
+}
