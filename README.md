@@ -549,3 +549,10 @@ curl --insecure https://whereami-test.alexmattson.demo.altostrat.com
   "timestamp": "2023-05-03T03:58:43",
   "zone": "us-central1-a"
 }
+
+# attempt to "update" cert 
+gcloud --project=${PROJECT} certificate-manager certificates update whereami-test-cert \
+    --certificate-file="whereami-test.alexmattson.demo.altostrat.com.crt" \
+    --private-key-file="whereami-test.alexmattson.demo.altostrat.com.key"
+
+```
