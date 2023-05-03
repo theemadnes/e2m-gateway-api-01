@@ -400,11 +400,11 @@ EOF
 
 kubectl apply -f gateway.yaml
 
-cat << EOF > httproute.yaml
+cat << EOF > edge2mesh-httproute.yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
-  name: asm-ingressgateway-httproute
+  name: edge2mesh-httproute
   namespace: asm-ingress
 spec:
   parentRefs:
@@ -420,5 +420,5 @@ spec:
       port: 443
 EOF
 
-kubectl apply -f httproute.yaml
+kubectl apply -f edge2mesh-httproute.yaml
 ```
