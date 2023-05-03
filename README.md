@@ -471,7 +471,7 @@ spec:
   gateways:
   - asm-ingress/asm-ingressgateway
   hosts:
-  - 'whereami.example.com'
+  - 'whereami-test.alexmattson.demo.altostrat.com'
   http:
   - route:
     - destination:
@@ -482,14 +482,45 @@ EOF
 
 kubectl apply -f whereami/whereami-vs.yaml
 
+# create DNS entry in my other project
+gcloud dns --project=mc-e2m-01 record-sets create whereami-test.alexmattson.demo.altostrat.com. --zone="alexmattson-demo" --type="A" --ttl="5" --rrdatas="34.149.203.18"
+
 # create self-signed cert for whereami and add to cert map
 # using https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#secure-using-ssl-certificate
-openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
- -subj "/CN=whereami.example.com/O=Edge2Mesh Inc" \
- -keyout whereami.example.com.key \
- -out whereami.example.com.crt
+openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+ -subj "/CN=whereami-test.alexmattson.demo.altostrat.com/O=Edge2Mesh Inc" \
+ -keyout whereami-test.alexmattson.demo.altostrat.com.key \
+ -out whereami-test.alexmattson.demo.altostrat.com.crt
 
+gcloud --project=${PROJECT} certificate-manager certificates create whereami-test-cert \
+    --certificate-file="whereami-test.alexmattson.demo.altostrat.com.crt" \
+    --private-key-file="whereami-test.alexmattson.demo.altostrat.com.key"
+
+gcloud --project=${PROJECT} certificate-manager maps entries create whereami-test-map-entry \
+    --map=edge2mesh-cert-map \
+    --hostname=whereami-test.alexmattson.demo.altostrat.com \
+    --certificates=whereami-test-cert
 
 # create httproute for whereami 
+cat << EOF > whereami/whereami-httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: whereami
+  namespace: asm-ingress
+spec:
+  parentRefs:
+  - name: external-http
+  hostnames:
+  - whereami-test.alexmattson.demo.altostrat.com
+  rules:
+  - matches:
+    - path:
+        value: /
+    backendRefs:
+    - name: asm-ingressgateway
+      port: 443
+EOF
 
+kubectl apply -f whereami/whereami-httproute.yaml
 ```

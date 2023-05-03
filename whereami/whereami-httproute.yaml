@@ -1,0 +1,17 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: whereami
+  namespace: asm-ingress
+spec:
+  parentRefs:
+  - name: external-http
+  hostnames:
+  - whereami-test.alexmattson.demo.altostrat.com
+  rules:
+  - matches:
+    - path:
+        value: /
+    backendRefs:
+    - name: asm-ingressgateway
+      port: 443
