@@ -65,17 +65,17 @@ kubectl -n asm-ingress create secret tls edge2mesh-credential \
 mkdir -p asm-ig/base
 
 cat <<EOF > asm-ig/base/kustomization.yaml
-bases:
+resources:
   - github.com/GoogleCloudPlatform/anthos-service-mesh-samples/docs/ingress-gateway-asm-manifests/base
 EOF
 
 mkdir asm-ig/variant
 
 cat <<EOF > asm-ig/variant/service-proto-type.yaml 
-apiVersion: "v1"
-kind: "Service"
+apiVersion: v1
+kind: Service
 metadata:
-  name: "asm-ingressgateway"
+  name: asm-ingressgateway
 spec:
   ports:
   - name: status-port
@@ -85,7 +85,7 @@ spec:
   - name: http
     port: 80
     targetPort: 8080
-  - name: "https"
+  - name: https
     port: 443
     targetPort: 8443
     appProtocol: HTTP2
@@ -93,10 +93,10 @@ spec:
 EOF
 
 cat <<EOF > asm-ig/variant/gateway.yaml
-apiVersion: "networking.istio.io/v1alpha3"
-kind: "Gateway"
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
 metadata:
-  name: "asm-ingressgateway"
+  name: asm-ingressgateway
 spec:
   servers:
   - port:
@@ -110,11 +110,15 @@ EOF
 
 cat <<EOF > asm-ig/variant/kustomization.yaml 
 namespace: asm-ingress
-bases:
+resources:
 - ../base
 patches:
-- service-proto-type.yaml
-- gateway.yaml
+- path: service-proto-type.yaml
+  target:
+    kind: Service
+- path: gateway.yaml
+  target:
+    kind: Gateway
 EOF
 
 # apply 
