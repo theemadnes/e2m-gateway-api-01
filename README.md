@@ -48,147 +48,77 @@ gcloud container fleet mesh update \
 gcloud container fleet mesh describe --project ${PROJECT}
 ```
 
-### start setting up ASM ingress gateway layer
+### Create self-signed certificate for ASM/Istio Gateway
 ```
-kubectl create namespace asm-ingress
-kubectl label namespace asm-ingress istio-injection=enabled
+openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+ -subj "/CN=frontend.endpoints.${PROJECT}.cloud.goog/O=Edge2Mesh Inc" \
+ -keyout frontend.endpoints.${PROJECT}.cloud.goog.key \
+ -out frontend.endpoints.${PROJECT}.cloud.goog.crt
 
+kubectl -n asm-ingress create secret tls edge2mesh-credential \
+ --key=frontend.endpoints.${PROJECT}.cloud.goog.key \
+ --cert=frontend.endpoints.${PROJECT}.cloud.goog.crt
+```
 
-# get the ingress gateway deployment config to local YAML
-cat <<EOF > ingress-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
-spec:
-  selector:
-    matchLabels:
-      asm: ingressgateway
-  template:
-    metadata:
-      annotations:
-        # This is required to tell Anthos Service Mesh to inject the gateway with the
-        # required configuration.
-        inject.istio.io/templates: gateway
-      labels:
-        asm: ingressgateway
-    spec:
-      securityContext:
-        fsGroup: 1337
-        runAsGroup: 1337
-        runAsNonRoot: true
-        runAsUser: 1337
-      containers:
-      - name: istio-proxy
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - all
-          privileged: false
-          readOnlyRootFilesystem: true
-        image: auto # The image will automatically update each time the pod starts.
-        resources:
-          limits:
-            cpu: 2000m
-            memory: 1024Mi
-          requests:
-            cpu: 100m
-            memory: 128Mi
-      serviceAccountName: asm-ingressgateway
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
-spec:
-  maxReplicas: 5
-  minReplicas: 3
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 50
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: asm-ingressgateway
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
-rules:
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "watch", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: asm-ingressgateway
-subjects:
-  - kind: ServiceAccount
-    name: asm-ingressgateway
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
+### Create the asm-ingress NS and deployment, service, SA, role, rolebinding, and Gateway object
+```
+mkdir -p asm-ig/base
+
+cat <<EOF > asm-ig/base/kustomization.yaml
+bases:
+  - github.com/GoogleCloudPlatform/anthos-service-mesh-samples/docs/ingress-gateway-asm-manifests/base
 EOF
 
+mkdir asm-ig/variant
 
-# apply the ingress deployment 
-kubectl apply -f ingress-deployment.yaml
-
-```
-
-### expose the ingress gateway deployment via ClusterIP service w/ NEGs
-```
-cat <<EOF > ingress-service.yaml
-apiVersion: v1
-kind: Service
+cat <<EOF > asm-ig/variant/service-proto-type.yaml 
+apiVersion: "v1"
+kind: "Service"
 metadata:
-  name: asm-ingressgateway
-  namespace: asm-ingress
-  #annotations:
-  #  cloud.google.com/neg: '{"ingress": true}'
-  labels:
-    asm: ingressgateway
+  name: "asm-ingressgateway"
 spec:
   ports:
-  # status-port exposes a /healthz/ready endpoint that can be used with GKE Ingress health checks
   - name: status-port
     port: 15021
     protocol: TCP
     targetPort: 15021
-  # Any ports exposed in Gateway resources should be exposed here.
-  - name: http2
+  - name: http
     port: 80
     targetPort: 8080
-  - name: https
+  - name: "https"
     port: 443
     targetPort: 8443
-    appProtocol: HTTP2 # https://cloud.google.com/kubernetes-engine/docs/how-to/secure-gateway#load-balancer-tls
-  selector:
-    asm: ingressgateway
+    appProtocol: HTTP2
   type: ClusterIP
 EOF
 
-# apply service
-kubectl apply -f ingress-service.yaml
+cat <<EOF > asm-ig/variant/gateway.yaml
+apiVersion: "networking.istio.io/v1alpha3"
+kind: "Gateway"
+metadata:
+  name: "asm-ingressgateway"
+spec:
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: edge2mesh-credential
+EOF
 
+cat <<EOF > asm-ig/variant/kustomization.yaml 
+namespace: asm-ingress
+bases:
+- ../base
+patches:
+- service-proto-type.yaml
+- gateway.yaml
+EOF
+
+# apply 
+kubectl apply -k asm-ig/variant
 ```
 
 ### create cloud armor security policy and reference via GCP backend policy
@@ -305,41 +235,6 @@ gcloud --project=${PROJECT} certificate-manager maps entries create edge2mesh-ce
     --map="edge2mesh-cert-map" \
     --certificates="edge2mesh-cert" \
     --hostname="frontend.endpoints.${PROJECT}.cloud.goog"
-```
-
-### Configure ASM/Istio Gateway resource and self-signed certificate
-```
-openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
- -subj "/CN=frontend.endpoints.${PROJECT}.cloud.goog/O=Edge2Mesh Inc" \
- -keyout frontend.endpoints.${PROJECT}.cloud.goog.key \
- -out frontend.endpoints.${PROJECT}.cloud.goog.crt
-
-kubectl -n asm-ingress create secret tls edge2mesh-credential \
- --key=frontend.endpoints.${PROJECT}.cloud.goog.key \
- --cert=frontend.endpoints.${PROJECT}.cloud.goog.crt
-
-cat <<EOF > ingress-gateway.yaml
-apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
-metadata:
-    name: asm-ingressgateway
-    namespace: asm-ingress
-spec:
-  selector:
-    asm: ingressgateway
-  servers:
-  - port:
-      number: 443
-      name: https
-      protocol: HTTPS
-    hosts:
-    - "*" # IMPORTANT: Must use wildcard here when using SSL, see note below
-    tls:
-      mode: SIMPLE
-      credentialName: edge2mesh-credential
-EOF
-
-kubectl apply -f ingress-gateway.yaml
 ```
 
 ### Deploy Online Boutique
