@@ -454,4 +454,9 @@ gcloud --project=${PROJECT} certificate-manager certificates update whereami-tes
     --certificate-file="whereami-test.alexmattson.demo.altostrat.com.crt" \
     --private-key-file="whereami-test.alexmattson.demo.altostrat.com.key"
 
+
+
+gcloud --project=${PROJECT} certificate-manager certificates list
+gcloud --project=${PROJECT} certificate-manager maps entries list --map=edge2mesh-cert-map
+
 ```
