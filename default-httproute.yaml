@@ -9,7 +9,7 @@ spec:
   rules:
   - matches:
     - path:
-        value: /*
+        value: /
     backendRefs:
     - name: asm-ingressgateway
       port: 443
