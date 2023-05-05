@@ -538,4 +538,24 @@ patchesStrategicMerge:
 EOF
 
 kubectl apply -k dummy/variant/
+
+
+
+# enable access logging 
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+data:
+  mesh: |-
+    accessLogFile: /dev/stdout
+kind: ConfigMap
+metadata:
+  name: istio-asm-managed-rapid
+  namespace: istio-system
+EOF
+
+# shell into a whereami pod
+kubectl -n whereami exec --stdin --tty whereami-645c569674-7v4x8 -- /bin/sh
+
+# get proxy logs 
+kubectl -n whereami logs -f whereami-645c569674-7v4x8 istio-proxy
 ```
