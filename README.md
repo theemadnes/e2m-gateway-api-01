@@ -292,6 +292,11 @@ spec:
   - name: http # list the port only so we can redirect any incoming http requests to https
     protocol: HTTP
     port: 80
+    allowedRoutes:
+      kinds:
+      - kind: HTTPRoute
+      namespaces:
+        from: Same # only allow the HTTP route for this namespace, and only for redirect purposes
   - name: https
     protocol: HTTPS
     port: 443
@@ -354,6 +359,8 @@ metadata:
 spec:
   parentRefs:
   - name: external-http
+    namespace: asm-ingress
+    sectionName: http
   rules:
   - filters:
     - type: RequestRedirect

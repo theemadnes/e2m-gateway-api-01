@@ -6,6 +6,8 @@ metadata:
 spec:
   parentRefs:
   - name: external-http
+    namespace: asm-ingress
+    sectionName: http
   rules:
   - filters:
     - type: RequestRedirect
