@@ -275,7 +275,7 @@ EOF
 kubectl apply -f frontend-virtualservice.yaml
 ```
 
-### Create Gateway and HTTPRoute
+### Create Gateway and HTTPRoutes
 
 ```
 cat <<EOF > gateway.yaml
@@ -289,6 +289,9 @@ metadata:
 spec:
   gatewayClassName: gke-l7-global-external-managed # gke-l7-gxlb
   listeners:
+  - name: http # list the port only so we can redirect any incoming http requests to https
+    protocol: HTTP
+    port: 80
   - name: https
     protocol: HTTPS
     port: 443
@@ -340,6 +343,25 @@ spec:
 EOF
 
 kubectl apply -f default-httproute.yaml
+
+# set up HTTP redirect as well
+cat << EOF > edge2mesh-http-redirect.yaml
+kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1beta1
+metadata:
+  name: edge2mesh-redirect
+  namespace: asm-ingress
+spec:
+  parentRefs:
+  - name: external-http
+  rules:
+  - filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+EOF
+
+kubectl apply -f edge2mesh-http-redirect.yaml
 ```
 
 ### testing adding whereami with self-signed cert to existing cert map
