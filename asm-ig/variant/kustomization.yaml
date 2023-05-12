@@ -1,0 +1,6 @@
+namespace: asm-ingress
+bases:
+- ../base
+patches:
+- service-proto-type.yaml
+- gateway.yaml

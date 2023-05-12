@@ -302,18 +302,37 @@ EOF
 
 kubectl apply -f gateway.yaml
 
-cat << EOF > edge2mesh-httproute.yaml
+#cat << EOF > edge2mesh-httproute.yaml
+#apiVersion: gateway.networking.k8s.io/v1beta1
+#kind: HTTPRoute
+#metadata:
+#  name: edge2mesh-httproute
+#  namespace: asm-ingress
+#spec:
+#  parentRefs:
+#  - name: external-http
+#  hostnames:
+#  - frontend.endpoints.${PROJECT}.cloud.goog
+#  rules:
+#  - matches:
+#    - path:
+#        value: /
+#    backendRefs:
+#    - name: asm-ingressgateway
+#      port: 443
+#EOF
+#
+#kubectl apply -f edge2mesh-httproute.yaml
+
+cat << EOF > default-httproute.yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
 metadata:
-  name: edge2mesh-httproute
+  name: default-httproute
   namespace: asm-ingress
 spec:
   parentRefs:
   - name: external-http
-    sectionName: https # we are only handling https requests in this HTTPRoute
-  hostnames:
-  - frontend.endpoints.${PROJECT}.cloud.goog
   rules:
   - matches:
     - path:
@@ -323,8 +342,9 @@ spec:
       port: 443
 EOF
 
-kubectl apply -f edge2mesh-httproute.yaml
+kubectl apply -f default-httproute.yaml
 
+# set up HTTP redirect as well
 cat << EOF > edge2mesh-http-redirect.yaml
 kind: HTTPRoute
 apiVersion: gateway.networking.k8s.io/v1beta1
@@ -334,7 +354,6 @@ metadata:
 spec:
   parentRefs:
   - name: external-http
-    sectionName: http # we are only handling http requets in this HTTPRoute - redirecting to https
   rules:
   - filters:
     - type: RequestRedirect
@@ -423,28 +442,29 @@ gcloud --project=${PROJECT} certificate-manager maps entries create whereami-tes
     --hostname=whereami-test.alexmattson.demo.altostrat.com \
     --certificates=whereami-test-cert
 
+# HTTPRoute below not needed any more
 # create httproute for whereami 
-cat << EOF > whereami/whereami-httproute.yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
-kind: HTTPRoute
-metadata:
-  name: whereami
-  namespace: asm-ingress
-spec:
-  parentRefs:
-  - name: external-http
-  hostnames:
-  - whereami-test.alexmattson.demo.altostrat.com
-  rules:
-  - matches:
-    - path:
-        value: /
-    backendRefs:
-    - name: asm-ingressgateway
-      port: 443
-EOF
-
-kubectl apply -f whereami/whereami-httproute.yaml
+#cat << EOF > whereami/whereami-httproute.yaml
+#apiVersion: gateway.networking.k8s.io/v1beta1
+#kind: HTTPRoute
+#metadata:
+#  name: whereami
+#  namespace: asm-ingress
+#spec:
+#  parentRefs:
+#  - name: external-http
+#  hostnames:
+#  - whereami-test.alexmattson.demo.altostrat.com
+#  rules:
+#  - matches:
+#    - path:
+#        value: /
+#    backendRefs:
+#    - name: asm-ingressgateway
+#      port: 443
+#EOF
+#
+#kubectl apply -f whereami/whereami-httproute.yaml
 ```
 
 ### testing stuff
@@ -477,4 +497,87 @@ gcloud --project=${PROJECT} certificate-manager certificates update whereami-tes
     --certificate-file="whereami-test.alexmattson.demo.altostrat.com.crt" \
     --private-key-file="whereami-test.alexmattson.demo.altostrat.com.key"
 
+
+
+gcloud --project=${PROJECT} certificate-manager certificates list
+gcloud --project=${PROJECT} certificate-manager maps entries list --map=edge2mesh-cert-map
+
+
+# get istioctl 
+curl -LO https://storage.googleapis.com/gke-release/asm/istio-1.17.2-asm.8-linux-amd64.tar.gz
+istio-1.17.2-asm.8/bin/istioctl analyze --all-namespaces
+
+kubectl create ns dummy
+kubectl label namespace dummy istio-injection=enabled
+
+cat <<EOF > dummy-vs.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: dummy-vs
+  namespace: dummy
+spec:
+  gateways:
+  - asm-ingress/asm-ingressgateway
+  hosts:
+  - 'whereami-test.alexmattson.demo.altostrat.com'
+  http:
+  - route:
+    - destination:
+        host: whereami
+        port:
+          number: 80
+EOF
+
+kubectl apply -f dummy-vs.yaml
+
+mkdir -p dummy/base
+mkdir dummy/variant
+
+# TODO: bases and patches are deprecated, so replace with updated approaches
+cat << EOF > dummy/base/kustomization.yaml
+bases:
+  - github.com/GoogleCloudPlatform/kubernetes-engine-samples/whereami/k8s
+EOF
+
+cat << EOF > dummy/variant/service-type.yaml
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "whereami"
+spec:
+  type: ClusterIP
+EOF
+
+cat << EOF > dummy/variant/kustomization.yaml
+namespace: dummy
+commonLabels:
+  app: whereami
+bases:
+- ../base
+patchesStrategicMerge:
+- service-type.yaml
+EOF
+
+kubectl apply -k dummy/variant/
+
+
+
+# enable access logging 
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+data:
+  mesh: |-
+    accessLogFile: /dev/stdout
+kind: ConfigMap
+metadata:
+  name: istio-asm-managed-rapid
+  namespace: istio-system
+EOF
+
+# shell into a whereami pod
+kubectl -n whereami exec --stdin --tty whereami-645c569674-7v4x8 -- /bin/sh
+
+# get proxy logs 
+kubectl -n whereami logs -f whereami-645c569674-7v4x8 istio-proxy
 ```
