@@ -366,6 +366,7 @@ spec:
     - type: RequestRedirect
       requestRedirect:
         scheme: https
+        statusCode: 301
 EOF
 
 kubectl apply -f default-httproute-redirect.yaml
