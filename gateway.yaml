@@ -8,6 +8,9 @@ metadata:
 spec:
   gatewayClassName: gke-l7-global-external-managed # gke-l7-gxlb
   listeners:
+  - name: http # list the port only so we can redirect any incoming http requests to https
+    protocol: HTTP
+    port: 80
   - name: https
     protocol: HTTPS
     port: 443

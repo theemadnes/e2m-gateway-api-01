@@ -345,11 +345,11 @@ EOF
 kubectl apply -f default-httproute.yaml
 
 # set up HTTP redirect as well
-cat << EOF > edge2mesh-http-redirect.yaml
+cat << EOF > default-httproute-redirect.yaml
 kind: HTTPRoute
 apiVersion: gateway.networking.k8s.io/v1beta1
 metadata:
-  name: edge2mesh-redirect
+  name: http-to-https-redirect-httproute
   namespace: asm-ingress
 spec:
   parentRefs:
@@ -361,7 +361,7 @@ spec:
         scheme: https
 EOF
 
-kubectl apply -f edge2mesh-http-redirect.yaml
+kubectl apply -f default-httproute-redirect.yaml
 ```
 
 ### testing adding whereami with self-signed cert to existing cert map
