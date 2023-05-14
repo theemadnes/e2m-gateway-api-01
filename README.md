@@ -595,6 +595,7 @@ kubectl -n whereami logs -f whereami-645c569674-7v4x8 istio-proxy
 ### testing out using Gateway API for Istio (instead of `gw` and `VirtualService` CRDs)
 
 ```
+# AVOID DOING THIS FOR NOW
 # check for existing `gw` resources (remember, that `gateway` is now owned by Gateway API)
 kubectl get gw -A
 # check for existing `virtualservice` resources, which will be replaced with `HTTPRoute`
