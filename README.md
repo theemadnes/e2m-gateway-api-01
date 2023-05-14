@@ -589,3 +589,9 @@ kubectl -n whereami exec --stdin --tty whereami-645c569674-7v4x8 -- /bin/sh
 # get proxy logs 
 kubectl -n whereami logs -f whereami-645c569674-7v4x8 istio-proxy
 ```
+
+### testing out using Gateway API for Istio (instead of `gw` and `VirtualService` CRDs)
+
+```
+
+```
