@@ -1,6 +1,10 @@
 namespace: asm-ingress
-bases:
+resources:
 - ../base
 patches:
-- service-proto-type.yaml
-- gateway.yaml
+- path: service-proto-type.yaml
+  target:
+    kind: Service
+- path: gateway.yaml
+  target:
+    kind: Gateway

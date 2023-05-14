@@ -103,6 +103,8 @@ spec:
       number: 443
       name: https
       protocol: HTTPS
+    hosts:
+    - "*" # IMPORTANT: Must use wildcard here when using SSL, see note below
     tls:
       mode: SIMPLE
       credentialName: edge2mesh-credential
@@ -593,5 +595,68 @@ kubectl -n whereami logs -f whereami-645c569674-7v4x8 istio-proxy
 ### testing out using Gateway API for Istio (instead of `gw` and `VirtualService` CRDs)
 
 ```
+# check for existing `gw` resources (remember, that `gateway` is now owned by Gateway API)
+kubectl get gw -A
+# check for existing `virtualservice` resources, which will be replaced with `HTTPRoute`
+kubectl get vs -A
 
+# in case it's still around, remove `dummy-vs`
+kubectl delete vs -n dummy dummy-vs
+
+# delete the existing `gw`
+kubectl delete gw -n asm-ingress asm-ingressgateway
+
+# create a `gateway` using Gateway API's `istio` `gatewayclass`
+cat <<EOF > gateway-api-istio.yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+spec:
+  gatewayClassName: istio
+  addresses:
+  - value: asm-ingressgateawy.asm-ingress.svc.cluster.local
+    type: Hostname
+  listeners:
+  - name: https
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: edge2mesh-credential
+    #allowedRoutes:
+    #  namespaces:
+    #    from: Selector
+    #    selector:
+    #      matchLabels:
+    #        kubernetes.io/metadata.name: default
+EOF
+
+kubectl apply -f gateway-api-istio.yaml
+
+# configure `httproute` replacement for the Online Boutique virtualservice
+cat <<EOF > gateway-api-istio-onlineboutique-httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: frontend-ingress
+  namespace: onlineboutique
+spec:
+  parentRefs:
+  - name: asm-ingressgateway
+    namespace: asm-ingress
+  hostnames: ["frontend.endpoints.${PROJECT}.cloud.goog"]
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: frontend
+      port: 80
+EOF
+
+kubectl apply -f gateway-api-istio-onlineboutique-httproute.yaml
 ```

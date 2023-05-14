@@ -1,0 +1,24 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+spec:
+  gatewayClassName: istio
+  addresses:
+  - value: asm-ingressgateawy.asm-ingress.svc.cluster.local
+    type: Hostname
+  listeners:
+  - name: https
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: edge2mesh-credential
+    #allowedRoutes:
+    #  namespaces:
+    #    from: Selector
+    #    selector:
+    #      matchLabels:
+    #        kubernetes.io/metadata.name: default
