@@ -48,6 +48,12 @@ gcloud container fleet mesh update \
 gcloud container fleet mesh describe --project ${PROJECT}
 ```
 
+### Create ingress gateway namespace
+```
+kubectl create namespace asm-ingress
+kubectl label namespace asm-ingress istio-injection=enabled
+```
+
 ### Create self-signed certificate for ASM/Istio Gateway
 ```
 openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
