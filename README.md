@@ -154,18 +154,14 @@ patches:
 - path: gateway.yaml
   target:
     kind: Gateway
-- path: role.yaml
-  target:
-    kind: Role
-- path: rolebinding.yaml
-  target:
-    kind: RoleBinding
 EOF
 
-# apply 
+# apply role & role binding
+kubectl apply -f asm-ig/variant/role.yaml
+kubectl apply -f
 kubectl apply -k asm-ig/variant
 ```
-**NOTE:** if you see an error then repeat the `kubectl apply` above. Warnings can be ignored
+**NOTE:** if you see an error then repeat the last `kubectl apply` above. Warnings can be ignored
 
 ### create cloud armor security policy and reference via GCP backend policy
 ```
