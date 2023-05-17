@@ -158,7 +158,7 @@ patches:
     kind: Gateway
 EOF
 
-# apply role
+# apply
 kubectl apply -k asm-ig/variant
 ```
 **NOTE:** if you see an error then repeat the `kubectl apply` above. Warnings can be ignored
