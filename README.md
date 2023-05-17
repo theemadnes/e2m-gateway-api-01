@@ -77,7 +77,7 @@ EOF
 
 mkdir asm-ig/variant
 
-cat <<EOF > asm-ig/base/role.yaml
+cat <<EOF > asm-ig/variant/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -89,7 +89,7 @@ rules:
   verbs: ["get", "watch", "list"]
 EOF
 
-cat <<EOF > asm-ig/base/rolebinding.yaml
+cat <<EOF > asm-ig/variant/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -154,6 +154,12 @@ patches:
 - path: gateway.yaml
   target:
     kind: Gateway
+- path: role.yaml
+  target:
+    kind: Role
+- path: rolebinding.yaml
+  target:
+    kind: RoleBinding
 EOF
 
 # apply 
