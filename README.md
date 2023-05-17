@@ -77,6 +77,33 @@ EOF
 
 mkdir asm-ig/variant
 
+cat <<EOF > asm-ig/variant/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+EOF
+
+cat <<EOF > asm-ig/variant/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: asm-ingressgateway
+  namespace: asm-ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: asm-ingressgateway
+subjects:
+  - kind: ServiceAccount
+    name: asm-ingressgateway
+EOF
+
 cat <<EOF > asm-ig/variant/service-proto-type.yaml 
 apiVersion: v1
 kind: Service
@@ -132,6 +159,7 @@ EOF
 # apply 
 kubectl apply -k asm-ig/variant
 ```
+**NOTE:** if you see an error then repeat the `kubectl apply` above. Warnings can be ignored
 
 ### create cloud armor security policy and reference via GCP backend policy
 ```
@@ -300,11 +328,6 @@ spec:
   - name: http # list the port only so we can redirect any incoming http requests to https
     protocol: HTTP
     port: 80
-    allowedRoutes:
-      kinds:
-      - kind: HTTPRoute
-      namespaces:
-        from: Same # only allow the HTTP route for this namespace, and only for redirect purposes
   - name: https
     protocol: HTTPS
     port: 443
@@ -315,28 +338,6 @@ EOF
 
 kubectl apply -f gateway.yaml
 
-#cat << EOF > edge2mesh-httproute.yaml
-#apiVersion: gateway.networking.k8s.io/v1beta1
-#kind: HTTPRoute
-#metadata:
-#  name: edge2mesh-httproute
-#  namespace: asm-ingress
-#spec:
-#  parentRefs:
-#  - name: external-http
-#  hostnames:
-#  - frontend.endpoints.${PROJECT}.cloud.goog
-#  rules:
-#  - matches:
-#    - path:
-#        value: /
-#    backendRefs:
-#    - name: asm-ingressgateway
-#      port: 443
-#EOF
-#
-#kubectl apply -f edge2mesh-httproute.yaml
-
 cat << EOF > default-httproute.yaml
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: HTTPRoute
@@ -346,6 +347,8 @@ metadata:
 spec:
   parentRefs:
   - name: external-http
+    namespace: asm-ingress
+    sectionName: https
   rules:
   - matches:
     - path:
@@ -379,6 +382,7 @@ EOF
 
 kubectl apply -f default-httproute-redirect.yaml
 ```
+**NOTE:** reconcilliation will take some time. `kubectl get gateway external-http -n asm-ingress -w` until `programmed=true`.
 
 ### testing adding whereami with self-signed cert to existing cert map
 
