@@ -147,6 +147,8 @@ cat <<EOF > asm-ig/variant/kustomization.yaml
 namespace: asm-ingress
 resources:
 - ../base
+- role.yaml
+- rolebinding.yaml
 patches:
 - path: service-proto-type.yaml
   target:
@@ -156,12 +158,10 @@ patches:
     kind: Gateway
 EOF
 
-# apply role & role binding
-kubectl apply -f asm-ig/variant/role.yaml
-kubectl apply -f
+# apply role
 kubectl apply -k asm-ig/variant
 ```
-**NOTE:** if you see an error then repeat the last `kubectl apply` above. Warnings can be ignored
+**NOTE:** if you see an error then repeat the `kubectl apply` above. Warnings can be ignored
 
 ### create cloud armor security policy and reference via GCP backend policy
 ```
