@@ -6,6 +6,8 @@ metadata:
 spec:
   parentRefs:
   - name: external-http
+    namespace: asm-ingress
+    sectionName: https
   rules:
   - matches:
     - path:

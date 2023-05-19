@@ -495,6 +495,9 @@ gcloud --project=${PROJECT} certificate-manager maps entries create whereami-tes
 # hit the main service
 curl https://frontend.endpoints.${PROJECT}.cloud.goog
 
+# test redirects 
+curl -L http://frontend.endpoints.${PROJECT}.cloud.goog
+
 # hit the other one i created using a secondary self-signed cert
 curl --insecure https://whereami-test.alexmattson.demo.altostrat.com
 {
