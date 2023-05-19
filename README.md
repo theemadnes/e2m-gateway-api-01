@@ -398,7 +398,7 @@ mkdir whereami/variant
 
 # TODO: bases and patches are deprecated, so replace with updated approaches
 cat << EOF > whereami/base/kustomization.yaml
-bases:
+resources:
   - github.com/GoogleCloudPlatform/kubernetes-engine-samples/whereami/k8s
 EOF
 
@@ -415,10 +415,12 @@ cat << EOF > whereami/variant/kustomization.yaml
 namespace: whereami
 commonLabels:
   app: whereami
-bases:
+resources:
 - ../base
-patchesStrategicMerge:
-- service-type.yaml
+patches:
+- path: service-type.yaml
+  target:
+    kind: Service
 EOF
 
 kubectl apply -k whereami/variant/

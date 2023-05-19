@@ -1,7 +1,9 @@
 namespace: whereami
 commonLabels:
   app: whereami
-bases:
+resources:
 - ../base
-patchesStrategicMerge:
-- service-type.yaml
+patches:
+- path: service-type.yaml
+  target:
+    kind: Service
