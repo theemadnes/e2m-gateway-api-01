@@ -1,2 +1,0 @@
-bases:
-  - github.com/GoogleCloudPlatform/kubernetes-engine-samples/whereami/k8s
